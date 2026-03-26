@@ -12,8 +12,8 @@ Date de intrare:
 - titlu, data, ora de inceput, ora de sfarsit, locatie, participanti pentru o intalnire
 - titlu, data scadenta, prioritate, durata estimata si status pentru o sarcina
 
-In acest proiect, datele de intrare sunt generate direct in program, in main,
-ca sa existe un scenariu complet de testare de la pornire.
+In acest proiect, datele sunt generate direct in program, in main,
+ca sa existe un scenariu complet de rulare de la pornire.
 
 Operatii posibile:
 - schimbarea culorii unei categorii si cautarea unui cuvant-cheie in categorie
@@ -23,56 +23,149 @@ Operatii posibile:
 - afisarea programului pe o zi
 - detectarea conflictelor dintre intalniri
 - afisarea sarcinilor urgente
-- generarea unui mic raport pe categorii
+- generarea unui raport pe categorii
 */
 
-#include <algorithm>
-#include <ctime>
-#include <iomanip>
 #include <iostream>
-#include <string>
-#include <vector>
+
+int lungimeText(const char* text) {
+    if (text == 0) {
+        return 0;
+    }
+
+    int lungime = 0;
+    while (text[lungime] != '\0') {
+        lungime++;
+    }
+    return lungime;
+}
+
+void copiazaText(char* destinatie, const char* sursa) {
+    if (destinatie == 0) {
+        return;
+    }
+
+    if (sursa == 0) {
+        destinatie[0] = '\0';
+        return;
+    }
+
+    int i = 0;
+    while (sursa[i] != '\0') {
+        destinatie[i] = sursa[i];
+        i++;
+    }
+    destinatie[i] = '\0';
+}
+
+bool texteEgale(const char* text1, const char* text2) {
+    if (text1 == 0 && text2 == 0) {
+        return true;
+    }
+
+    if (text1 == 0 || text2 == 0) {
+        return false;
+    }
+
+    int i = 0;
+    while (text1[i] != '\0' && text2[i] != '\0') {
+        if (text1[i] != text2[i]) {
+            return false;
+        }
+        i++;
+    }
+
+    return text1[i] == text2[i];
+}
+
+char* copieText(const char* sursa) {
+    int lungime = lungimeText(sursa);
+    char* destinatie = new char[lungime + 1];
+    copiazaText(destinatie, sursa);
+    return destinatie;
+}
+
+bool contineSubsir(const char* text, const char* cheie) {
+    if (text == 0 || cheie == 0) {
+        return false;
+    }
+
+    if (cheie[0] == '\0') {
+        return true;
+    }
+
+    int lungimeTextTotal = lungimeText(text);
+    int lungimeCheie = lungimeText(cheie);
+
+    if (lungimeCheie > lungimeTextTotal) {
+        return false;
+    }
+
+    for (int i = 0; i <= lungimeTextTotal - lungimeCheie; i++) {
+        bool potrivire = true;
+        for (int j = 0; j < lungimeCheie; j++) {
+            if (text[i + j] != cheie[j]) {
+                potrivire = false;
+                break;
+            }
+        }
+
+        if (potrivire) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 class Categorie {
 private:
-    std::string nume;
-    std::string culoare;
-    std::string descriere;
-
-    bool contineText(const std::string& sursa, const std::string& cheie) const {
-        return sursa.find(cheie) != std::string::npos;
-    }
+    char* nume;
+    char* culoare;
+    char* descriere;
 
 public:
-    Categorie(const std::string& nume_, const std::string& culoare_, const std::string& descriere_)
-        : nume(nume_), culoare(culoare_), descriere(descriere_) {
+    Categorie(const char* nume_ = "", const char* culoare_ = "", const char* descriere_ = "") {
+        nume = copieText(nume_);
+        culoare = copieText(culoare_);
+        descriere = copieText(descriere_);
     }
 
-    Categorie(const Categorie& alta)
-        : nume(alta.nume), culoare(alta.culoare), descriere(alta.descriere) {
+    Categorie(const Categorie& alta) {
+        nume = copieText(alta.nume);
+        culoare = copieText(alta.culoare);
+        descriere = copieText(alta.descriere);
     }
 
     Categorie& operator=(const Categorie& alta) {
         if (this != &alta) {
-            nume = alta.nume;
-            culoare = alta.culoare;
-            descriere = alta.descriere;
+            delete[] nume;
+            delete[] culoare;
+            delete[] descriere;
+
+            nume = copieText(alta.nume);
+            culoare = copieText(alta.culoare);
+            descriere = copieText(alta.descriere);
         }
         return *this;
     }
 
     ~Categorie() {
+        delete[] nume;
+        delete[] culoare;
+        delete[] descriere;
     }
 
-    void schimbaCuloare(const std::string& culoareNoua) {
-        culoare = culoareNoua;
+    void schimbaCuloare(const char* culoareNoua) {
+        delete[] culoare;
+        culoare = copieText(culoareNoua);
     }
 
-    bool contineCuvantCheie(const std::string& cheie) const {
-        return contineText(nume, cheie) || contineText(descriere, cheie);
+    bool contineCuvantCheie(const char* cheie) const {
+        return contineSubsir(nume, cheie) || contineSubsir(descriere, cheie);
     }
 
-    const std::string& getNume() const {
+    const char* getNume() const {
         return nume;
     }
 
@@ -86,61 +179,103 @@ public:
 
 class Intalnire {
 private:
-    std::string titlu;
-    std::string data;
-    std::string oraStart;
-    std::string oraSfarsit;
-    std::string locatie;
+    char* titlu;
+    char* data;
+    char* oraStart;
+    char* oraSfarsit;
+    char* locatie;
     Categorie categorie;
-    std::vector<std::string> participanti;
+    char** participanti;
+    int nrParticipanti;
 
-    int oraInMinute(const std::string& ora) const {
-        const int ore = (ora[0] - '0') * 10 + (ora[1] - '0');
-        const int minute = (ora[3] - '0') * 10 + (ora[4] - '0');
+    int oraInMinute(const char* ora) const {
+        int ore = (ora[0] - '0') * 10 + (ora[1] - '0');
+        int minute = (ora[3] - '0') * 10 + (ora[4] - '0');
         return ore * 60 + minute;
     }
 
+    void elibereazaParticipanti() {
+        for (int i = 0; i < nrParticipanti; i++) {
+            delete[] participanti[i];
+        }
+        delete[] participanti;
+        participanti = 0;
+        nrParticipanti = 0;
+    }
+
+    void copieParticipanti(const char* const* lista, int numar) {
+        nrParticipanti = numar;
+
+        if (nrParticipanti == 0) {
+            participanti = 0;
+            return;
+        }
+
+        participanti = new char*[nrParticipanti];
+        for (int i = 0; i < nrParticipanti; i++) {
+            participanti[i] = copieText(lista[i]);
+        }
+    }
+
 public:
-    Intalnire(const std::string& titlu_,
-              const std::string& data_,
-              const std::string& oraStart_,
-              const std::string& oraSfarsit_,
-              const std::string& locatie_,
-              const Categorie& categorie_,
-              const std::vector<std::string>& participanti_)
-        : titlu(titlu_),
-          data(data_),
-          oraStart(oraStart_),
-          oraSfarsit(oraSfarsit_),
-          locatie(locatie_),
-          categorie(categorie_),
-          participanti(participanti_) {
+    Intalnire(const char* titlu_ = "",
+              const char* data_ = "",
+              const char* oraStart_ = "00:00",
+              const char* oraSfarsit_ = "00:00",
+              const char* locatie_ = "",
+              const Categorie& categorie_ = Categorie(),
+              const char* const* participanti_ = 0,
+              int nrParticipanti_ = 0)
+        : categorie(categorie_) {
+        titlu = copieText(titlu_);
+        data = copieText(data_);
+        oraStart = copieText(oraStart_);
+        oraSfarsit = copieText(oraSfarsit_);
+        locatie = copieText(locatie_);
+        participanti = 0;
+        nrParticipanti = 0;
+        copieParticipanti(participanti_, nrParticipanti_);
     }
 
     Intalnire(const Intalnire& alta)
-        : titlu(alta.titlu),
-          data(alta.data),
-          oraStart(alta.oraStart),
-          oraSfarsit(alta.oraSfarsit),
-          locatie(alta.locatie),
-          categorie(alta.categorie),
-          participanti(alta.participanti) {
+        : categorie(alta.categorie) {
+        titlu = copieText(alta.titlu);
+        data = copieText(alta.data);
+        oraStart = copieText(alta.oraStart);
+        oraSfarsit = copieText(alta.oraSfarsit);
+        locatie = copieText(alta.locatie);
+        participanti = 0;
+        nrParticipanti = 0;
+        copieParticipanti((const char* const*)alta.participanti, alta.nrParticipanti);
     }
 
     Intalnire& operator=(const Intalnire& alta) {
         if (this != &alta) {
-            titlu = alta.titlu;
-            data = alta.data;
-            oraStart = alta.oraStart;
-            oraSfarsit = alta.oraSfarsit;
-            locatie = alta.locatie;
+            delete[] titlu;
+            delete[] data;
+            delete[] oraStart;
+            delete[] oraSfarsit;
+            delete[] locatie;
+            elibereazaParticipanti();
+
+            titlu = copieText(alta.titlu);
+            data = copieText(alta.data);
+            oraStart = copieText(alta.oraStart);
+            oraSfarsit = copieText(alta.oraSfarsit);
+            locatie = copieText(alta.locatie);
             categorie = alta.categorie;
-            participanti = alta.participanti;
+            copieParticipanti((const char* const*)alta.participanti, alta.nrParticipanti);
         }
         return *this;
     }
 
     ~Intalnire() {
+        delete[] titlu;
+        delete[] data;
+        delete[] oraStart;
+        delete[] oraSfarsit;
+        delete[] locatie;
+        elibereazaParticipanti();
     }
 
     int calculeazaDurataMinute() const {
@@ -148,34 +283,36 @@ public:
     }
 
     bool seSuprapuneCu(const Intalnire& alta) const {
-        if (data != alta.data) {
+        if (!texteEgale(data, alta.data)) {
             return false;
         }
 
-        const int start1 = oraInMinute(oraStart);
-        const int final1 = oraInMinute(oraSfarsit);
-        const int start2 = oraInMinute(alta.oraStart);
-        const int final2 = oraInMinute(alta.oraSfarsit);
+        int start1 = oraInMinute(oraStart);
+        int final1 = oraInMinute(oraSfarsit);
+        int start2 = oraInMinute(alta.oraStart);
+        int final2 = oraInMinute(alta.oraSfarsit);
 
-        return std::max(start1, start2) < std::min(final1, final2);
+        return !(final1 <= start2 || final2 <= start1);
     }
 
-    void mutaInterval(const std::string& oraStartNoua, const std::string& oraSfarsitNoua) {
+    void mutaInterval(const char* oraStartNoua, const char* oraSfarsitNoua) {
         if (oraInMinute(oraStartNoua) < oraInMinute(oraSfarsitNoua)) {
-            oraStart = oraStartNoua;
-            oraSfarsit = oraSfarsitNoua;
+            delete[] oraStart;
+            delete[] oraSfarsit;
+            oraStart = copieText(oraStartNoua);
+            oraSfarsit = copieText(oraSfarsitNoua);
         }
     }
 
-    bool esteInData(const std::string& dataCautata) const {
-        return data == dataCautata;
+    bool esteInData(const char* dataCautata) const {
+        return texteEgale(data, dataCautata);
     }
 
     const Categorie& getCategorie() const {
         return categorie;
     }
 
-    const std::string& getTitlu() const {
+    const char* getTitlu() const {
         return titlu;
     }
 
@@ -187,9 +324,9 @@ public:
             << "\", categorie=" << intalnire.categorie
             << ", participanti=[";
 
-        for (std::size_t i = 0; i < intalnire.participanti.size(); ++i) {
+        for (int i = 0; i < intalnire.nrParticipanti; i++) {
             out << intalnire.participanti[i];
-            if (i + 1 < intalnire.participanti.size()) {
+            if (i < intalnire.nrParticipanti - 1) {
                 out << ", ";
             }
         }
@@ -201,48 +338,51 @@ public:
 
 class Sarcina {
 private:
-    std::string titlu;
-    std::string dataScadenta;
+    char* titlu;
+    char* dataScadenta;
     int prioritate;
     bool finalizata;
     int durataEstimata;
     Categorie categorie;
 
-    int serialZi(const std::string& data) const {
-        const int an = (data[0] - '0') * 1000 + (data[1] - '0') * 100 + (data[2] - '0') * 10 + (data[3] - '0');
-        const int luna = (data[5] - '0') * 10 + (data[6] - '0');
-        const int zi = (data[8] - '0') * 10 + (data[9] - '0');
+    int serialZi(const char* data) const {
+        int an = (data[0] - '0') * 1000 + (data[1] - '0') * 100 + (data[2] - '0') * 10 + (data[3] - '0');
+        int luna = (data[5] - '0') * 10 + (data[6] - '0');
+        int zi = (data[8] - '0') * 10 + (data[9] - '0');
         return an * 372 + luna * 31 + zi;
     }
 
 public:
-    Sarcina(const std::string& titlu_,
-            const std::string& dataScadenta_,
-            int prioritate_,
-            bool finalizata_,
-            int durataEstimata_,
-            const Categorie& categorie_)
-        : titlu(titlu_),
-          dataScadenta(dataScadenta_),
-          prioritate(prioritate_),
-          finalizata(finalizata_),
-          durataEstimata(durataEstimata_),
-          categorie(categorie_) {
+    Sarcina(const char* titlu_ = "",
+            const char* dataScadenta_ = "",
+            int prioritate_ = 1,
+            bool finalizata_ = false,
+            int durataEstimata_ = 0,
+            const Categorie& categorie_ = Categorie())
+        : categorie(categorie_) {
+        titlu = copieText(titlu_);
+        dataScadenta = copieText(dataScadenta_);
+        prioritate = prioritate_;
+        finalizata = finalizata_;
+        durataEstimata = durataEstimata_;
     }
 
     Sarcina(const Sarcina& alta)
-        : titlu(alta.titlu),
-          dataScadenta(alta.dataScadenta),
-          prioritate(alta.prioritate),
-          finalizata(alta.finalizata),
-          durataEstimata(alta.durataEstimata),
-          categorie(alta.categorie) {
+        : categorie(alta.categorie) {
+        titlu = copieText(alta.titlu);
+        dataScadenta = copieText(alta.dataScadenta);
+        prioritate = alta.prioritate;
+        finalizata = alta.finalizata;
+        durataEstimata = alta.durataEstimata;
     }
 
     Sarcina& operator=(const Sarcina& alta) {
         if (this != &alta) {
-            titlu = alta.titlu;
-            dataScadenta = alta.dataScadenta;
+            delete[] titlu;
+            delete[] dataScadenta;
+
+            titlu = copieText(alta.titlu);
+            dataScadenta = copieText(alta.dataScadenta);
             prioritate = alta.prioritate;
             finalizata = alta.finalizata;
             durataEstimata = alta.durataEstimata;
@@ -252,14 +392,16 @@ public:
     }
 
     ~Sarcina() {
+        delete[] titlu;
+        delete[] dataScadenta;
     }
 
     void marcheazaFinalizata() {
         finalizata = true;
     }
 
-    bool esteUrgenta(const std::string& dataCurenta) const {
-        const int diferenta = serialZi(dataScadenta) - serialZi(dataCurenta);
+    bool esteUrgenta(const char* dataCurenta) const {
+        int diferenta = serialZi(dataScadenta) - serialZi(dataCurenta);
         return !finalizata && diferenta >= 0 && diferenta <= 2;
     }
 
@@ -271,8 +413,8 @@ public:
         return scor;
     }
 
-    bool esteInData(const std::string& dataCautata) const {
-        return dataScadenta == dataCautata;
+    bool esteInData(const char* dataCautata) const {
+        return texteEgale(dataScadenta, dataCautata);
     }
 
     bool esteFinalizata() const {
@@ -283,7 +425,7 @@ public:
         return categorie;
     }
 
-    const std::string& getTitlu() const {
+    const char* getTitlu() const {
         return titlu;
     }
 
@@ -304,84 +446,186 @@ public:
 
 class Agenda {
 private:
-    std::string proprietar;
-    std::vector<Categorie> categorii;
-    std::vector<Intalnire> intalniri;
-    std::vector<Sarcina> sarcini;
+    char* proprietar;
 
-    bool categorieExista(const std::string& numeCategorie) const {
-        for (const Categorie& categorie : categorii) {
-            if (categorie.getNume() == numeCategorie) {
+    Categorie* categorii;
+    int nrCategorii;
+    int capacitateCategorii;
+
+    Intalnire* intalniri;
+    int nrIntalniri;
+    int capacitateIntalniri;
+
+    Sarcina* sarcini;
+    int nrSarcini;
+    int capacitateSarcini;
+
+    void redimensioneazaCategorii() {
+        capacitateCategorii = capacitateCategorii * 2;
+        Categorie* nou = new Categorie[capacitateCategorii];
+        for (int i = 0; i < nrCategorii; i++) {
+            nou[i] = categorii[i];
+        }
+        delete[] categorii;
+        categorii = nou;
+    }
+
+    void redimensioneazaIntalniri() {
+        capacitateIntalniri = capacitateIntalniri * 2;
+        Intalnire* nou = new Intalnire[capacitateIntalniri];
+        for (int i = 0; i < nrIntalniri; i++) {
+            nou[i] = intalniri[i];
+        }
+        delete[] intalniri;
+        intalniri = nou;
+    }
+
+    void redimensioneazaSarcini() {
+        capacitateSarcini = capacitateSarcini * 2;
+        Sarcina* nou = new Sarcina[capacitateSarcini];
+        for (int i = 0; i < nrSarcini; i++) {
+            nou[i] = sarcini[i];
+        }
+        delete[] sarcini;
+        sarcini = nou;
+    }
+
+    bool categorieExista(const char* numeCategorie) const {
+        for (int i = 0; i < nrCategorii; i++) {
+            if (texteEgale(categorii[i].getNume(), numeCategorie)) {
                 return true;
             }
         }
         return false;
     }
 
-    int minuteTotaleIntalniriDinZi(const std::string& data) const {
+    int minuteTotaleIntalniriDinZi(const char* data) const {
         int total = 0;
-        for (const Intalnire& intalnire : intalniri) {
-            if (intalnire.esteInData(data)) {
-                total += intalnire.calculeazaDurataMinute();
+        for (int i = 0; i < nrIntalniri; i++) {
+            if (intalniri[i].esteInData(data)) {
+                total += intalniri[i].calculeazaDurataMinute();
             }
         }
         return total;
     }
 
 public:
-    Agenda(const std::string& proprietar_,
-           const std::vector<Categorie>& categorii_,
-           const std::vector<Intalnire>& intalniri_,
-           const std::vector<Sarcina>& sarcini_)
-        : proprietar(proprietar_),
-          categorii(categorii_),
-          intalniri(intalniri_),
-          sarcini(sarcini_) {
+    Agenda(const char* proprietar_ = "") {
+        proprietar = copieText(proprietar_);
+
+        nrCategorii = 0;
+        capacitateCategorii = 5;
+        categorii = new Categorie[capacitateCategorii];
+
+        nrIntalniri = 0;
+        capacitateIntalniri = 5;
+        intalniri = new Intalnire[capacitateIntalniri];
+
+        nrSarcini = 0;
+        capacitateSarcini = 5;
+        sarcini = new Sarcina[capacitateSarcini];
     }
 
-    Agenda(const Agenda& alta)
-        : proprietar(alta.proprietar),
-          categorii(alta.categorii),
-          intalniri(alta.intalniri),
-          sarcini(alta.sarcini) {
+    Agenda(const Agenda& alta) {
+        proprietar = copieText(alta.proprietar);
+
+        nrCategorii = alta.nrCategorii;
+        capacitateCategorii = alta.capacitateCategorii;
+        categorii = new Categorie[capacitateCategorii];
+        for (int i = 0; i < nrCategorii; i++) {
+            categorii[i] = alta.categorii[i];
+        }
+
+        nrIntalniri = alta.nrIntalniri;
+        capacitateIntalniri = alta.capacitateIntalniri;
+        intalniri = new Intalnire[capacitateIntalniri];
+        for (int i = 0; i < nrIntalniri; i++) {
+            intalniri[i] = alta.intalniri[i];
+        }
+
+        nrSarcini = alta.nrSarcini;
+        capacitateSarcini = alta.capacitateSarcini;
+        sarcini = new Sarcina[capacitateSarcini];
+        for (int i = 0; i < nrSarcini; i++) {
+            sarcini[i] = alta.sarcini[i];
+        }
     }
 
     Agenda& operator=(const Agenda& alta) {
         if (this != &alta) {
-            proprietar = alta.proprietar;
-            categorii = alta.categorii;
-            intalniri = alta.intalniri;
-            sarcini = alta.sarcini;
+            delete[] proprietar;
+            delete[] categorii;
+            delete[] intalniri;
+            delete[] sarcini;
+
+            proprietar = copieText(alta.proprietar);
+
+            nrCategorii = alta.nrCategorii;
+            capacitateCategorii = alta.capacitateCategorii;
+            categorii = new Categorie[capacitateCategorii];
+            for (int i = 0; i < nrCategorii; i++) {
+                categorii[i] = alta.categorii[i];
+            }
+
+            nrIntalniri = alta.nrIntalniri;
+            capacitateIntalniri = alta.capacitateIntalniri;
+            intalniri = new Intalnire[capacitateIntalniri];
+            for (int i = 0; i < nrIntalniri; i++) {
+                intalniri[i] = alta.intalniri[i];
+            }
+
+            nrSarcini = alta.nrSarcini;
+            capacitateSarcini = alta.capacitateSarcini;
+            sarcini = new Sarcina[capacitateSarcini];
+            for (int i = 0; i < nrSarcini; i++) {
+                sarcini[i] = alta.sarcini[i];
+            }
         }
         return *this;
     }
 
     ~Agenda() {
+        delete[] proprietar;
+        delete[] categorii;
+        delete[] intalniri;
+        delete[] sarcini;
     }
 
     void adaugaCategorie(const Categorie& categorie) {
         if (!categorieExista(categorie.getNume())) {
-            categorii.push_back(categorie);
+            if (nrCategorii == capacitateCategorii) {
+                redimensioneazaCategorii();
+            }
+            categorii[nrCategorii] = categorie;
+            nrCategorii++;
         }
     }
 
     void adaugaIntalnire(const Intalnire& intalnire) {
-        intalniri.push_back(intalnire);
+        if (nrIntalniri == capacitateIntalniri) {
+            redimensioneazaIntalniri();
+        }
+        intalniri[nrIntalniri] = intalnire;
+        nrIntalniri++;
     }
 
     void adaugaSarcina(const Sarcina& sarcina) {
-        sarcini.push_back(sarcina);
+        if (nrSarcini == capacitateSarcini) {
+            redimensioneazaSarcini();
+        }
+        sarcini[nrSarcini] = sarcina;
+        nrSarcini++;
     }
 
-    void afiseazaProgramPeZi(const std::string& data) const {
+    void afiseazaProgramPeZi(const char* data) const {
         std::cout << "\nProgramul din " << data << ":\n";
 
         std::cout << "Intalniri:\n";
         bool existaIntalniri = false;
-        for (const Intalnire& intalnire : intalniri) {
-            if (intalnire.esteInData(data)) {
+        for (int i = 0; i < nrIntalniri; i++) {
+            if (intalniri[i].esteInData(data)) {
                 existaIntalniri = true;
-                std::cout << "  - " << intalnire << "\n";
+                std::cout << "  - " << intalniri[i] << "\n";
             }
         }
         if (!existaIntalniri) {
@@ -390,10 +634,10 @@ public:
 
         std::cout << "Sarcini cu termen in ziua asta:\n";
         bool existaSarcini = false;
-        for (const Sarcina& sarcina : sarcini) {
-            if (sarcina.esteInData(data)) {
+        for (int i = 0; i < nrSarcini; i++) {
+            if (sarcini[i].esteInData(data)) {
                 existaSarcini = true;
-                std::cout << "  - " << sarcina << "\n";
+                std::cout << "  - " << sarcini[i] << "\n";
             }
         }
         if (!existaSarcini) {
@@ -407,8 +651,8 @@ public:
         std::cout << "\nConflicte intre intalniri:\n";
         bool gasit = false;
 
-        for (std::size_t i = 0; i < intalniri.size(); ++i) {
-            for (std::size_t j = i + 1; j < intalniri.size(); ++j) {
+        for (int i = 0; i < nrIntalniri; i++) {
+            for (int j = i + 1; j < nrIntalniri; j++) {
                 if (intalniri[i].seSuprapuneCu(intalniri[j])) {
                     gasit = true;
                     std::cout << "  - conflict intre \"" << intalniri[i].getTitlu()
@@ -422,14 +666,14 @@ public:
         }
     }
 
-    void afiseazaSarciniUrgente(const std::string& dataCurenta) const {
+    void afiseazaSarciniUrgente(const char* dataCurenta) const {
         std::cout << "\nSarcini urgente la data " << dataCurenta << ":\n";
         bool gasit = false;
 
-        for (const Sarcina& sarcina : sarcini) {
-            if (sarcina.esteUrgenta(dataCurenta)) {
+        for (int i = 0; i < nrSarcini; i++) {
+            if (sarcini[i].esteUrgenta(dataCurenta)) {
                 gasit = true;
-                std::cout << "  - " << sarcina << "\n";
+                std::cout << "  - " << sarcini[i] << "\n";
             }
         }
 
@@ -441,27 +685,27 @@ public:
     void afiseazaRaportCategorii() const {
         std::cout << "\nRaport pe categorii:\n";
 
-        for (const Categorie& categorie : categorii) {
-            int nrIntalniri = 0;
-            int nrSarcini = 0;
+        for (int i = 0; i < nrCategorii; i++) {
+            int nrIntalniriCategorie = 0;
+            int nrSarciniCategorie = 0;
             int minuteSarcini = 0;
 
-            for (const Intalnire& intalnire : intalniri) {
-                if (intalnire.getCategorie().getNume() == categorie.getNume()) {
-                    ++nrIntalniri;
+            for (int j = 0; j < nrIntalniri; j++) {
+                if (texteEgale(intalniri[j].getCategorie().getNume(), categorii[i].getNume())) {
+                    nrIntalniriCategorie++;
                 }
             }
 
-            for (const Sarcina& sarcina : sarcini) {
-                if (sarcina.getCategorie().getNume() == categorie.getNume()) {
-                    ++nrSarcini;
-                    minuteSarcini += sarcina.getDurataEstimata();
+            for (int j = 0; j < nrSarcini; j++) {
+                if (texteEgale(sarcini[j].getCategorie().getNume(), categorii[i].getNume())) {
+                    nrSarciniCategorie++;
+                    minuteSarcini += sarcini[j].getDurataEstimata();
                 }
             }
 
-            std::cout << "  - " << categorie.getNume()
-                      << ": intalniri=" << nrIntalniri
-                      << ", sarcini=" << nrSarcini
+            std::cout << "  - " << categorii[i].getNume()
+                      << ": intalniri=" << nrIntalniriCategorie
+                      << ", sarcini=" << nrSarciniCategorie
                       << ", minute estimate pentru sarcini=" << minuteSarcini << "\n";
         }
     }
@@ -469,18 +713,18 @@ public:
     friend std::ostream& operator<<(std::ostream& out, const Agenda& agenda) {
         out << "Agenda lui " << agenda.proprietar << "\n";
         out << "Categorii:\n";
-        for (const Categorie& categorie : agenda.categorii) {
-            out << "  - " << categorie << "\n";
+        for (int i = 0; i < agenda.nrCategorii; i++) {
+            out << "  - " << agenda.categorii[i] << "\n";
         }
 
         out << "Intalniri:\n";
-        for (const Intalnire& intalnire : agenda.intalniri) {
-            out << "  - " << intalnire << "\n";
+        for (int i = 0; i < agenda.nrIntalniri; i++) {
+            out << "  - " << agenda.intalniri[i] << "\n";
         }
 
         out << "Sarcini:\n";
-        for (const Sarcina& sarcina : agenda.sarcini) {
-            out << "  - " << sarcina << "\n";
+        for (int i = 0; i < agenda.nrSarcini; i++) {
+            out << "  - " << agenda.sarcini[i] << "\n";
         }
 
         return out;
@@ -493,7 +737,19 @@ int main() {
     Categorie munca("Munca", "galben", "taskuri legate de lucru");
 
     personal.schimbaCuloare("mov");
-    facultate.contineCuvantCheie("teme");
+
+    if (facultate.contineCuvantCheie("teme")) {
+        std::cout << "Categoria " << facultate.getNume() << " contine cuvantul cautat.\n";
+    }
+
+    Categorie copieCategorie(facultate);
+    Categorie categorieAsignata;
+    categorieAsignata = personal;
+
+    const char* participanti1[] = {"Carlos", "colegii"};
+    const char* participanti2[] = {"Carlos", "Ana", "Vlad"};
+    const char* participanti3[] = {"Carlos", "client"};
+    const char* participanti4[] = {"Carlos"};
 
     Intalnire labPOO(
         "Laborator POO",
@@ -502,7 +758,8 @@ int main() {
         "12:00",
         "FMI sala 214",
         facultate,
-        {"Carlos", "colegii"}
+        participanti1,
+        2
     );
 
     Intalnire proiectEchipa(
@@ -512,22 +769,43 @@ int main() {
         "12:30",
         "Google Meet",
         facultate,
-        {"Carlos", "Ana", "Vlad"}
+        participanti2,
+        3
+    );
+
+    Intalnire callClient(
+        "Call client",
+        "2026-03-25",
+        "18:00",
+        "19:00",
+        "Birou",
+        munca,
+        participanti3,
+        2
     );
 
     Intalnire mersSala(
         "Sala",
         "2026-03-25",
-        "18:00",
-        "19:30",
+        "18:30",
+        "20:00",
         "World Class",
         personal,
-        {"Carlos"}
+        participanti4,
+        1
     );
 
-    proiectEchipa.calculeazaDurataMinute();
-    labPOO.seSuprapuneCu(proiectEchipa);
-    proiectEchipa.mutaInterval("12:30", "13:30");
+    std::cout << "Durata pentru " << labPOO.getTitlu() << " este de "
+              << labPOO.calculeazaDurataMinute() << " minute.\n";
+
+    if (labPOO.seSuprapuneCu(proiectEchipa)) {
+        std::cout << "Intalnirea de proiect se suprapunea initial cu laboratorul, asa ca a fost mutata.\n";
+        proiectEchipa.mutaInterval("12:30", "13:30");
+    }
+
+    Intalnire copieIntalnire(labPOO);
+    Intalnire intalnireAsignata;
+    intalnireAsignata = proiectEchipa;
 
     Sarcina temaPA(
         "Finalizat tema la PA",
@@ -556,28 +834,59 @@ int main() {
         munca
     );
 
-    temaPA.esteUrgenta("2026-03-25");
-    temaPA.calculeazaScor();
+    std::cout << "Scor pentru sarcina \"" << temaPA.getTitlu() << "\" este "
+              << temaPA.calculeazaScor() << ".\n";
+
+    if (temaPA.esteUrgenta("2026-03-25")) {
+        std::cout << "Sarcina " << temaPA.getTitlu() << " este urgenta.\n";
+    }
+
     cumparaturi.marcheazaFinalizata();
+    if (cumparaturi.esteFinalizata()) {
+        std::cout << "Sarcina " << cumparaturi.getTitlu() << " a fost marcata ca finalizata.\n";
+    }
 
-    Agenda agendaMea("Carlos", {}, {}, {});
-    agendaMea.adaugaCategorie(facultate);
-    agendaMea.adaugaCategorie(personal);
-    agendaMea.adaugaCategorie(munca);
+    std::cout << "Categoria sarcinii de raport este "
+              << raportClient.getCategorie().getNume() << ", iar durata estimata este "
+              << raportClient.getDurataEstimata() << " minute.\n";
 
-    agendaMea.adaugaIntalnire(labPOO);
-    agendaMea.adaugaIntalnire(proiectEchipa);
-    agendaMea.adaugaIntalnire(mersSala);
+    Sarcina copieSarcina(temaPA);
+    Sarcina sarcinaAsignata;
+    sarcinaAsignata = raportClient;
 
-    agendaMea.adaugaSarcina(temaPA);
-    agendaMea.adaugaSarcina(cumparaturi);
-    agendaMea.adaugaSarcina(raportClient);
+    Agenda agendaCarlos("Carlos");
+    agendaCarlos.adaugaCategorie(facultate);
+    agendaCarlos.adaugaCategorie(personal);
+    agendaCarlos.adaugaCategorie(munca);
 
-    std::cout << agendaMea << "\n";
-    agendaMea.afiseazaProgramPeZi("2026-03-25");
-    agendaMea.detecteazaConflicte();
-    agendaMea.afiseazaSarciniUrgente("2026-03-25");
-    agendaMea.afiseazaRaportCategorii();
+    agendaCarlos.adaugaIntalnire(labPOO);
+    agendaCarlos.adaugaIntalnire(proiectEchipa);
+    agendaCarlos.adaugaIntalnire(callClient);
+    agendaCarlos.adaugaIntalnire(mersSala);
+
+    agendaCarlos.adaugaSarcina(temaPA);
+    agendaCarlos.adaugaSarcina(cumparaturi);
+    agendaCarlos.adaugaSarcina(raportClient);
+
+    Agenda agendaCopie(agendaCarlos);
+    Agenda agendaAsignata;
+    agendaAsignata = agendaCarlos;
+
+    std::cout << "\n" << agendaCarlos;
+    agendaCarlos.afiseazaProgramPeZi("2026-03-25");
+    agendaCarlos.detecteazaConflicte();
+    agendaCarlos.afiseazaSarciniUrgente("2026-03-25");
+    agendaCarlos.afiseazaRaportCategorii();
+
+    std::cout << "\nCopiile facute pentru obiecte exista in program si au fost create corect.\n";
+    std::cout << copieCategorie << "\n";
+    std::cout << copieIntalnire << "\n";
+    std::cout << copieSarcina << "\n";
+    std::cout << agendaCopie;
+    std::cout << agendaAsignata;
+    std::cout << categorieAsignata << "\n";
+    std::cout << intalnireAsignata << "\n";
+    std::cout << sarcinaAsignata << "\n";
 
     return 0;
 }
